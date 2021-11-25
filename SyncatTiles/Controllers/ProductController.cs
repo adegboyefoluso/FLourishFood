@@ -16,7 +16,8 @@ namespace SyncatTiles.Controllers
     public class ProductController : Controller
     {
         private readonly ApplicationDbContext _db;
-        private readonly IWebHostEnvironment _webHostEnvironment; //using dependency injection  to get  the webhost environment
+        private readonly IWebHostEnvironment _webHostEnvironment; //using dependency injection  to get  the webhost environment to access the root file of the (Wwwroot)  getting to
+                                                                  //the image path of the  images
         public ProductController(ApplicationDbContext db, IWebHostEnvironment webHostEnvironment)
         {
             _db = db;
@@ -66,6 +67,7 @@ namespace SyncatTiles.Controllers
             }
             else
             {
+                // This is for edit
                 productVM.Product = _db.Product.Find(id);
                 if (productVM.Product is null)
                 {
@@ -96,57 +98,77 @@ namespace SyncatTiles.Controllers
         {
             if (ModelState.IsValid)
             {
-                var files = HttpContext.Request.Form.Files;
-                string webRootPath = _webHostEnvironment.WebRootPath;
-                if (obj.Product.Id == 0)
+                var files = HttpContext.Request.Form.Files;  // retrieving  a new file or image uploaded 
+                string webRootPath = _webHostEnvironment.WebRootPath; // Path to wwwroot folder
+                if (obj.Product.Id == 0)       
                 {
                     //Creating a product
-                    string upload = webRootPath + WebConstant.ImagePath;  ///GEt the the path to image when we want to save the image
-                    string fileName = Guid.NewGuid().ToString();
+                    string upload = webRootPath + WebConstant.ImagePath;  ///Get the  path to the folder where the image will be save
+                    string fileName = Guid.NewGuid().ToString();// generating a guid for the file name 
                     string extension = Path.GetExtension(files[0].FileName);  // Get the file extension
 
-                    using(var filestream = new FileStream(Path.Combine(upload, fileName + extension), FileMode.Create))
+                    using(var filestream = new FileStream(Path.Combine(upload, fileName + extension), FileMode.Create)) // copy the file to the new location(which is upload)
                     {
-                        files[0].CopyTo(filestream);                  //copy file to new location
+                        files[0].CopyTo(filestream);                
                     }
 
+                    //when the file is copied to the new location , The file path in the product object has to be modified.
+                    // I am only storing the  fileName  and the extension and not the full file path
                     obj.Product.Image = fileName + extension;
                     _db.Product.Add(obj.Product);
                     _db.SaveChanges();
                 }
                 else
                 {
-                    //Updating                   use AsNoTracking to prevent ef tracking tow  product with the same key
-                    var objfromDb = _db.Product.AsNoTracking().FirstOrDefault(u => u.Id == obj.Product.Id); 
-                    if (files.Count > 0)  // if file is updated
+
+                    //==> if an image is update, it has to be replace with the new image
+                    //==> Retrieve entity from the database and update its property 
+
+                    //Updating      use AsNoTracking to prevent ef tracking tow  product with the same key
+
+                    var objfromDb = _db.Product.AsNoTracking().FirstOrDefault(u => u.Id == obj.Product.Id); //retriving obj from the database
+                    if (files.Count > 0)  //if file .count is greater than 0, then ,a new file has been uploaded for an existing product==>generate a file name, extension and copy the file path to the upload folder oin the wwwroot
+
                     {
                         string upload = webRootPath + WebConstant.ImagePath;  ///GEt the the path to image when we want to save the image
-                        string fileName = Guid.NewGuid().ToString();
+                        string fileName = Guid.NewGuid().ToString(); //Generate a name for the file using a guid
                         string extension = Path.GetExtension(files[0].FileName);  // Get the file extension
 
+                        //Old path 
                         var oldFile = Path.Combine(upload, objfromDb.Image);
+                        //Check if the old path exist in the  upload folder,  if it does , Then i will delete if from wwwroot /images/product folder
                         if (System.IO.File.Exists(oldFile))
                         {
                             System.IO.File.Delete(oldFile);
                         }
 
+                        //Copy the new image  to the  wwwroot/images/product folder
                         using (var filestream = new FileStream(Path.Combine(upload, fileName + extension), FileMode.Create))
                         {
                             files[0].CopyTo(filestream);                  //copy file to new location
                         }
-                        obj.Product.Image = fileName + extension; // if image is modified, we change the file name  and extension
+                        obj.Product.Image = fileName + extension; // if image is modified, we change the file name  and extension to the new file name and extension.
                     }
 
+                    //If  file image was not updated , but something else was updated, The imaage will  not change since it was not modified
                     else
                     {
                         obj.Product.Image = objfromDb.Image;
 
                     }
                     _db.Product.Update(obj.Product);
+                    // An issue that came up  is that Entity framework is tracking two  products, The objfromDb  that was retrived from the database and the obj model
+                    // This will cause error and antity framework will not know wich product to save because both of them has  the same key/id               ,
+                    // to prevent it , Add the linq method of AsNoTracking() when getting object from the database that you dont want EF to track. We are only retriving the objfrmDb just to get the image name and the path 
+                    // : refer to line :129
+
                 }
                 _db.SaveChanges();
                 return RedirectToAction("Index");
             }
+            
+            // if the model state is not valid,  the slect list item are not been populated, the view or the model state that will be returned will not the select list, hence this have to be reloaded again 
+            // this will reload all of the drop downs if the model state is not valid.
             obj.CategorySelectgList = _db.Category.Select(e => new SelectListItem
             {
                 Text = e.CategoryName,

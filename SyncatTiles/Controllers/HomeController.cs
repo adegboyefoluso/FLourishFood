@@ -77,6 +77,28 @@ namespace SyncatTiles.Controllers
             HttpContext.Session.Set(WebConstant.SessionCart, shoppingCartList);
             return RedirectToAction(nameof(Index));
         }
+
+       
+        public IActionResult RemoveFromCart(int id)
+        {
+            List<ShoppingCart> shoppingCartList = new List<ShoppingCart>();
+
+            if (HttpContext.Session.Get<IEnumerable<ShoppingCart>>(WebConstant.SessionCart) != null
+                && HttpContext.Session.Get<IEnumerable<ShoppingCart>>(WebConstant.SessionCart).Count() > 0)
+            {
+                shoppingCartList = HttpContext.Session.Get<List<ShoppingCart>>(WebConstant.SessionCart);
+            }
+
+            var itemToRemove = shoppingCartList.SingleOrDefault(r => r.ProductId == id);
+            if(itemToRemove != null)
+            {
+                shoppingCartList.Remove(itemToRemove);
+            }
+
+           
+            HttpContext.Session.Set(WebConstant.SessionCart, shoppingCartList);
+            return RedirectToAction(nameof(Index));
+        }
         public IActionResult Privacy()
         {
             return View();

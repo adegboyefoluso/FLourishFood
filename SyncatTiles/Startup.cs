@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SyncatTiles.Data;
+using SyncatTiles.Models.Utility;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,6 +31,11 @@ namespace SyncatTiles
             services.AddDbContext<ApplicationDbContext>(options =>    // configure connection string
             options.UseSqlServer(
                 Configuration.GetConnectionString("DefaultConnection")));
+            services.AddIdentity<IdentityUser,IdentityRole>()
+                .AddDefaultTokenProviders().AddDefaultUI()
+                .AddEntityFrameworkStores<ApplicationDbContext>();
+
+            services.AddTransient<IEmailSender, EmailSender>();
 
             services.AddHttpContextAccessor();
             services.AddSession(Options=>
@@ -57,11 +65,12 @@ namespace SyncatTiles
             app.UseStaticFiles();
 
             app.UseRouting();
-
+            app.UseAuthentication();
             app.UseAuthorization();
             app.UseSession();
             app.UseEndpoints(endpoints =>
             {
+                endpoints.MapRazorPages();
                 endpoints.MapControllerRoute(
                     name: "default",
 
